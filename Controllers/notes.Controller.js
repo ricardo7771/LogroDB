@@ -16,9 +16,16 @@ export async function getMyNotes(req, res) {
 
 export async function getAllNotes(req, res) {
   try {
-    const notes = await NotesService.getAllNotes();
+    const { page, limit, search } = req.query;
+
+    const notes = await NotesService.getAllNotes({
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+      search: search || null
+    });
 
     return res.status(200).json(notes);
+
   } catch (error) {
     return res.status(500).json({
       error: error.message
@@ -45,6 +52,13 @@ export async function createNote(req, res) {
 
     return res.status(201).json(note);
   } catch (error) {
+
+    if (error.message === "Tipo de nota inválido") {
+      return res.status(400).json({
+        error: "note_type debe ser 'NOTA' o 'APUNTE'"
+      });
+    }
+
     return res.status(500).json({
       error: error.message
     });
@@ -60,6 +74,13 @@ export async function patchNote(req, res) {
 
     return res.status(200).json(result);
   } catch (error) {
+
+    if (error.message === "Tipo de nota inválido") {
+      return res.status(400).json({
+        error: "note_type debe ser 'NOTA' o 'APUNTE'"
+      });
+    }
+
     return res.status(403).json({
       error: error.message
     });

@@ -42,13 +42,24 @@ export async function login(req, res) {
 }
 
 export async function forgotPassword(req, res) {
-    try {
-        const { email } = req.body; 
-        const data = await authService.forgotPassword(email); 
-        return res.status(200).json(data); 
-    } catch (error) {
-        return res.status(400).json({ error: error.message });
+  try {
+    const { email } = req.body;
+
+    const data = await authService.forgotPassword(email);
+
+    return res.status(200).json(data);
+
+  } catch (error) {
+    if (error.message === "El email es obligatorio") {
+      return res.status(400).json({
+        error: error.message
+      });
     }
+    
+    return res.status(500).json({
+      error: "Error al procesar la solicitud"
+    });
+  }
 }
 
 // NUEVO: El que faltaba para completar el flujo con el token de Resend

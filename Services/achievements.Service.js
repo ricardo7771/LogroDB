@@ -14,8 +14,26 @@ export async function getMyAchievements(user_id) {
   return rows;
 }
 
-export async function getAllAchievements() {
-  const [rows] = await pool.query(`
+export async function getAllAchievements({
+  page = 1,
+  limit = 10,
+  search = null
+}) {
+
+  const offset = (page - 1) * limit;
+
+  let where = "";
+  let params = [];
+
+  // 🔍 SEARCH por título
+  if (search && search.trim() !== "") {
+    where = "WHERE a.title LIKE ?";
+    params.push(`%${search}%`);
+  }
+
+  // 🔹 DATA
+  const [rows] = await pool.query(
+    `
     SELECT 
       a.id,
       a.title,
@@ -31,9 +49,24 @@ export async function getAllAchievements() {
       u.email
     FROM achievements a
     JOIN users u ON a.user_id = u.id
+    ${where}
     ORDER BY a.created_at DESC
-  `);
+    LIMIT ? OFFSET ?
+    `,
+    [...params, Number(limit), Number(offset)]
+  );
 
+  // 🔹 TOTAL
+  const [[{ total }]] = await pool.query(
+    `
+    SELECT COUNT(*) AS total
+    FROM achievements a
+    ${where}
+    `,
+    params
+  );
+
+  // 🔹 FORMATO
   const formatted = rows.map(row => ({
     achievement: {
       id: row.id,
@@ -53,7 +86,15 @@ export async function getAllAchievements() {
     }
   }));
 
-  return formatted;
+  return {
+    data: formatted,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 }
 
 export async function createAchievement(title, description, achieved_at, achievement_type, user_id) {

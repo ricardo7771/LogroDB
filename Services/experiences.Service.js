@@ -16,10 +16,25 @@ export async function getMyExperiences(user_id) {
   return rows;
 }
 
+export async function getAllExperiences({
+  page = 1,
+  limit = 10,
+  search = null
+}) {
 
-// 🔹 GET TODAS LAS EXPERIENCIAS (ADMIN)
-export async function getAllExperiences() {
-  const [rows] = await pool.query(`
+  const offset = (page - 1) * limit;
+
+  let where = "";
+  let params = [];
+
+  if (search && search.trim() !== "") {
+    where = "WHERE e.company LIKE ? OR e.position LIKE ?";
+    params.push(`%${search}%`, `%${search}%`);
+  }
+
+  // 🔹 DATA
+  const [rows] = await pool.query(
+    `
     SELECT 
       e.id,
       e.company,
@@ -36,9 +51,24 @@ export async function getAllExperiences() {
       u.email
     FROM experiences e
     JOIN users u ON e.user_id = u.id
+    ${where}
     ORDER BY e.created_at DESC
-  `);
+    LIMIT ? OFFSET ?
+    `,
+    [...params, Number(limit), Number(offset)]
+  );
 
+  // 🔹 TOTAL
+  const [[{ total }]] = await pool.query(
+    `
+    SELECT COUNT(*) AS total
+    FROM experiences e
+    ${where}
+    `,
+    params
+  );
+
+  // 🔹 FORMATO
   const formatted = rows.map(row => ({
     experience: {
       id: row.id,
@@ -59,9 +89,16 @@ export async function getAllExperiences() {
     }
   }));
 
-  return formatted;
+  return {
+    data: formatted,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 }
-
 
 // 🔹 CREATE EXPERIENCE (USER)
 export async function createExperience(

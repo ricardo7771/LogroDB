@@ -16,13 +16,18 @@ export async function getMyExperiences(req, res) {
   }
 }
 
-
-// 🔹 GET TODAS LAS EXPERIENCIAS (ADMIN)
 export async function getAllExperiences(req, res) {
   try {
-    const experiences = await ExperienceService.getAllExperiences();
+    const { page, limit, search } = req.query;
+
+    const experiences = await ExperienceService.getAllExperiences({
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+      search: search || null
+    });
 
     return res.status(200).json(experiences);
+
   } catch (error) {
     return res.status(500).json({
       error: error.message
@@ -30,8 +35,6 @@ export async function getAllExperiences(req, res) {
   }
 }
 
-
-// 🔹 CREATE EXPERIENCE (USER)
 export async function createExperience(req, res) {
   try {
     const { company, position, description, start_date, end_date } = req.body;

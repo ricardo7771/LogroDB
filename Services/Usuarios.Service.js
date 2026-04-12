@@ -5,7 +5,7 @@ export async function getMyUser(id) {
   const [rows] = await pool.query(
     `
     SELECT id, names, first_last_name, second_last_name,
-           email, role, created_at, updated_at
+           email, role, created_at, updated_at, profile_image_url
     FROM users
     WHERE id = ?
     `,
@@ -63,7 +63,7 @@ export async function patchUserProfile(id, data) {
   const values = []; 
 
   // 5. CAMBIO: Se agrega profile_image_url para el link de Cloudinary
-  const camposPermitidos = ['names', 'first_last_name', 'second_last_name', 'email', 'profile_image_url'];
+  const camposPermitidos = ['names', 'first_last_name', 'second_last_name', 'profile_image_url'];
 
   camposPermitidos.forEach(campo => {
     if (data[campo] !== undefined) {
@@ -99,21 +99,6 @@ export async function patchUserAdmin(id, data) {
   if (data.second_last_name !== undefined) {
     fields.push("second_last_name = ?"); 
     values.push(data.second_last_name); 
-  }
-
-  if (data.email !== undefined) {
-
-    const [emailCheck] = await pool.query(
-      "SELECT id FROM users WHERE email = ? AND id != ?",
-      [data.email, id]
-    );
-
-    if (emailCheck.length > 0) {
-      throw new Error("El email ya está en uso");
-    }
-
-    fields.push("email = ?"); 
-    values.push(data.email); 
   }
 
   if (data.role !== undefined) {

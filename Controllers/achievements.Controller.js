@@ -15,20 +15,24 @@ export async function getMyAchievements(req, res) {
   }
 }
 
-
-// 🔹 GET TODOS LOS LOGROS (ADMIN)
 export async function getAllAchievements(req, res) {
   try {
-    const achievements = await AchievementService.getAllAchievements();
+    const { page, limit, search } = req.query;
+
+    const achievements = await AchievementService.getAllAchievements({
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+      search: search || null
+    });
 
     return res.status(200).json(achievements);
+
   } catch (error) {
     return res.status(500).json({
       error: error.message
     });
   }
 }
-
 
 // 🔹 CREATE (USER)
 export async function createAchievement(req, res) {

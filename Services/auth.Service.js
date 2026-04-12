@@ -111,29 +111,33 @@ export async function login({email, password}) {
         }
     } 
 }
-// 1. Solicitar el código (POST)
-export async function forgotPassword(email) {
-  if (!email) throw new Error("El email es obligatorio");
 
-  const [user] = await pool.query("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
-  
+export async function forgotPassword(email) {
+  if (!email) {
+    throw new Error("El email es obligatorio");
+  }
+
+  const [user] = await pool.query(
+    "SELECT id FROM users WHERE email = ? LIMIT 1",
+    [email]
+  );
+
   if (user.length === 0) {
     return { message: "Si el correo existe, se enviaron instrucciones" };
   }
 
-  // GENERAR CÓDIGO DE 6 DÍGITOS (Ejemplo: 529401)
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  
-  // EXPIRACIÓN CORTA (15 minutos es más seguro para códigos)
-  const expires = new Date(Date.now() + 15 * 60 * 1000); 
+  const expires = new Date(Date.now() + 15 * 60 * 1000);
 
-  // Guardamos el código en la misma columna 'reset_token'
   await pool.query(
-    "UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
+    `
+    UPDATE users 
+    SET reset_token = ?, reset_token_expires = ? 
+    WHERE email = ?
+    `,
     [code, expires, email]
   );
 
-  // Enviamos el código por correo
   await sendResetEmail(email, code);
 
   return { message: "Código de verificación enviado al correo" };
@@ -168,40 +172,3 @@ export async function resetPassword({ token, newPassword }) {
   return { message: "Contraseña actualizada correctamente" };
 }
 
-//pendiente a revicion
-/*
-export async function forgotPassword(email){
-    if(!email){
-      throw new Error("Se necesita un email para restablecer la contraseña");
-    }
-
-    const [rows] = await pool.query(
-      `
-      SELECT id FROM users WHERE email = ? LIMIT 1
-      `,
-      email
-    ); 
-
-    if(rows.length === 0){
-      throw new Error("Si el correo existe, se enviaran instrucciones");
-    }
-
-    const token = crypto.randomBytes(32).toString("hex"); 
-    const expires = new Date(Date.now() + 60 * 60 * 1000); 
-
-    await pool.query(
-    `UPDATE users 
-     SET reset_token = ?, reset_token_expires = ?
-     WHERE email = ?`,
-    [token, expires, email]
-    );
-
-    await sendResetEmail(email, token);
-
-  return {
-    message: "Si el correo existe, se enviaron instrucciones",
-    token
-  };
-
-}
-*/

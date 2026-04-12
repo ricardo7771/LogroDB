@@ -16,10 +16,25 @@ export async function getMyTasks(user_id) {
   return rows;
 }
 
+export async function getAllTasks({
+  page = 1,
+  limit = 10,
+  search = null
+}) {
 
-// 🔹 GET TODAS LAS TASKS (ADMIN)
-export async function getAllTasks() {
-  const [rows] = await pool.query(`
+  const offset = (page - 1) * limit;
+
+  let where = "";
+  let params = [];
+
+  // 🔍 SEARCH por título
+  if (search && search.trim() !== "") {
+    where = "WHERE t.title LIKE ?";
+    params.push(`%${search}%`);
+  }
+
+  const [rows] = await pool.query(
+    `
     SELECT 
       t.id,
       t.title,
@@ -35,9 +50,24 @@ export async function getAllTasks() {
       u.email
     FROM tasks t
     JOIN users u ON t.user_id = u.id
+    ${where}
     ORDER BY t.created_at DESC
-  `);
+    LIMIT ? OFFSET ?
+    `,
+    [...params, Number(limit), Number(offset)]
+  );
 
+  // 🔹 TOTAL
+  const [[{ total }]] = await pool.query(
+    `
+    SELECT COUNT(*) AS total
+    FROM tasks t
+    ${where}
+    `,
+    params
+  );
+
+  // 🔹 FORMATO
   const formatted = rows.map(row => ({
     task: {
       id: row.id,
@@ -57,7 +87,15 @@ export async function getAllTasks() {
     }
   }));
 
-  return formatted;
+  return {
+    data: formatted,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 }
 
 

@@ -16,13 +16,18 @@ export async function getMyTasks(req, res) {
   }
 }
 
-
-// 🔹 GET TODAS LAS TASKS (ADMIN)
 export async function getAllTasks(req, res) {
   try {
-    const tasks = await TaskService.getAllTasks();
+    const { page, limit, search } = req.query;
+
+    const tasks = await TaskService.getAllTasks({
+      page: Number(page) || 1,
+      limit: Number(limit) || 10,
+      search: search || null
+    });
 
     return res.status(200).json(tasks);
+
   } catch (error) {
     return res.status(500).json({
       error: error.message
