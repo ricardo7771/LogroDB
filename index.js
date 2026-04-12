@@ -4,6 +4,10 @@ import config from "./DB/ConfigDB.js";
 import authRouter from "./Routers/auth.Route.js";
 import userRouter from "./Routers/Usuarios.Route.js"; 
 import contentRoutes from "./Routers/content.routes.js"; 
+import notesRouter from "./Routers/notes.Route.js"; 
+import achievementsRouter from "./Routers/achievements.Route.js"; 
+import tasksRouter from "./Routers/tasks.Route.js";
+import experiencesRouter from "./Routers/experiences.Route.js";
 import {pool} from "./DB/ConexionDB.js"; 
 
 const app = express(); 
@@ -22,6 +26,10 @@ app.use((req, res, next) => {
 app.use("/api/auth", authRouter);
 app.use('/api', contentRoutes);
 app.use("/api", userRouter);
+app.use("/api", notesRouter);
+app.use("/api", achievementsRouter);
+app.use("/api", tasksRouter);
+app.use("/api", experiencesRouter);
 
 // Ruta de prueba
 app.get("/api/health", async (req, res) => {

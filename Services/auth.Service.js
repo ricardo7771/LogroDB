@@ -44,7 +44,7 @@ export async function register({names, first_last_name, second_last_name, email,
     )
 
     return {
-        id: result.insertId, 
+        id: result.insertId,
         names,
         email, 
         role: finalRole
