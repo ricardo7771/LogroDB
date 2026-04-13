@@ -1,24 +1,20 @@
 import config from "../DB/ConfigDB.js";
-import {pool} from "../DB/ConexionDB.js";
+import { pool } from "../DB/ConexionDB.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
-//import { sendResetEmail } from "../Utils/mailer.Util.js";
 import { sendResetEmail } from "../Utils/mailer.Util.js";
 
 const JWT_TOKEN = config.jwtSecret;
 
-// ... (imports iguales)
-
-export async function register({names, first_last_name, second_last_name, email, password, role}) {
+export async function register({ names, first_last_name, second_last_name, email, password, role, profile_image_url }) {
   
-  // 1. CAMBIO: Validación solo para Gmail
+  // 1. Validación solo para Gmail (Tu lógica original)
   const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
   if (!email || !gmailRegex.test(email)) {
     throw new Error("Solo se permiten correos de @gmail.com");
   }
 
-  // 2. CAMBIO: Validación de caracteres (Mínimo 8 como pide el nuevo requisito)
+  // 2. Validación de caracteres (Tu lógica original)
   if (!password || password.length < 8 || password.length > 20) {
     throw new Error("La contraseña debe tener entre 8 y 20 caracteres");
   }
@@ -33,23 +29,26 @@ export async function register({names, first_last_name, second_last_name, email,
 
   const hashPassword = await bcrypt.hash(password, 10); 
 
-  // 3. CAMBIO: Lógica de rol automático (Si no envían nada, es USER)
+  // 3. Lógica de rol automático
   const finalRole = role ? role.toUpperCase() : "USER";
+  
+  // Usamos la URL que viene de Cloudinary o null si no hay
+  const imageUrl = profile_image_url || null;
 
   try {
     const [result] = await pool.query(
-        // Agregado 'role' al INSERT
-        "INSERT INTO users (names, first_last_name, second_last_name, email, password, role) VALUES(?,?,?,?,?,?)",
-        [names, first_last_name, second_last_name, email, hashPassword, finalRole]
-    )
+        // Agregado 'profile_image_url' al INSERT
+        "INSERT INTO users (names, first_last_name, second_last_name, email, password, role, profile_image_url) VALUES(?,?,?,?,?,?,?)",
+        [names, first_last_name, second_last_name, email, hashPassword, finalRole, imageUrl]
+    );
 
     return {
         id: result.insertId,
         names,
         email, 
-        role: finalRole
-    }
-// ... resto del código igual
+        role: finalRole,
+        profile_image_url: imageUrl
+    };
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
       throw new Error("El email ya existe");
@@ -58,48 +57,32 @@ export async function register({names, first_last_name, second_last_name, email,
   }
 }
 
-export async function login({email, password}) {
+export async function login({ email, password }) {
+    if(!email) throw new Error("Ingrese su email");
+    if(!password) throw new Error("Ingrese su contraseña");
 
-    if(!email){
-        throw new Error("Ingrese su email")
-    }
-
-    if(!password){
-        throw new Error("Ingrese su contraseña")
-    }
-
-   let query = `
+    let query = `
     SELECT id, names, first_last_name, second_last_name, email, password, role 
     FROM users 
     WHERE email = ? 
     LIMIT 1
-  `;
+    `;
     const [row] = await pool.query(query, [email]);
 
-    if (row.length === 0){
-        throw new Error("Sin credenciales validas")
-    }
+    if (row.length === 0) throw new Error("Sin credenciales validas");
 
     const user = row[0];
-
     const passwordMatch = await bcrypt.compare(password, user.password); 
 
-    if(!passwordMatch){
-        throw new Error("Credenciales invalidas")
-    }
+    if(!passwordMatch) throw new Error("Credenciales invalidas");
 
     const token = jwt.sign(
-        {
-            id: user.id, 
-            email: user.email, 
-            role: user.role
-        }, 
+        { id: user.id, email: user.email, role: user.role }, 
         JWT_TOKEN, 
-        {expiresIn: "1h"}
-
+        { expiresIn: "1h" }
     ); 
 
-    return{
+    return {
         token, 
         user: {
             id: user.id, 
@@ -109,13 +92,11 @@ export async function login({email, password}) {
             email: user.email, 
             role: user.role
         }
-    } 
+    };
 }
 
 export async function forgotPassword(email) {
-  if (!email) {
-    throw new Error("El email es obligatorio");
-  }
+  if (!email) throw new Error("El email es obligatorio");
 
   const [user] = await pool.query(
     "SELECT id FROM users WHERE email = ? LIMIT 1",
@@ -130,40 +111,28 @@ export async function forgotPassword(email) {
   const expires = new Date(Date.now() + 15 * 60 * 1000);
 
   await pool.query(
-    `
-    UPDATE users 
-    SET reset_token = ?, reset_token_expires = ? 
-    WHERE email = ?
-    `,
+    "UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE email = ?",
     [code, expires, email]
   );
 
   await sendResetEmail(email, code);
-
   return { message: "Código de verificación enviado al correo" };
 }
 
-// 2. Validar código y cambiar contraseña (PATCH)
 export async function resetPassword({ token, newPassword }) {
-  // El 'token' que recibe ahora es el código de 6 dígitos que el usuario escribe
-  
   if (newPassword.length < 8 || newPassword.length > 20) {
     throw new Error("La contraseña debe tener entre 8 y 20 caracteres");
   }
 
-  // Buscamos el código y que no haya expirado
   const [rows] = await pool.query(
     "SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > NOW() LIMIT 1",
     [token]
   );
 
-  if (rows.length === 0) {
-    throw new Error("Código inválido o expirado");
-  }
+  if (rows.length === 0) throw new Error("Código inválido o expirado");
 
   const hashPassword = await bcrypt.hash(newPassword, 10);
 
-  // Limpiamos el código de la BD para que no se use otra vez
   await pool.query(
     "UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?",
     [hashPassword, rows[0].id]
@@ -171,4 +140,3 @@ export async function resetPassword({ token, newPassword }) {
 
   return { message: "Contraseña actualizada correctamente" };
 }
-
